@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rent Don't Buy | Marketplace</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for compiling JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        /* Custom Styles & Animations */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Hide scrollbar for clean horizontal scrolls */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bounce-slow { 
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
+        .animate-bounce-slow { animation: bounce-slow 3s infinite ease-in-out; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-200 selection:text-emerald-900">
+    <!-- Root element for React -->
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, createContext, useContext } = React;
+
+        // --- MOCK DATA ---
+        const CATEGORIES = [
+            { id: 'electronics', name: 'Electronics', icon: 'fa-bolt' },
+            { id: 'cameras', name: 'Cameras', icon: 'fa-camera' },
+            { id: 'vehicles', name: 'Vehicles', icon: 'fa-motorcycle' },
+            { id: 'furniture', name: 'Furniture', icon: 'fa-couch' },
+            { id: 'tools', name: 'Tools', icon: 'fa-box' },
+            { id: 'gaming', name: 'Gaming', icon: 'fa-gamepad' },
+        ];
+
+        const INITIAL_PRODUCTS = [
+            {
+                id: 'p1', name: 'Sony A7 IV Mirrorless Camera', category: 'cameras',
+                pricePerDay: 1200, purchasePrice: 210000, location: 'Thrissur, Kerala',
+                rating: 4.9, reviews: 24, image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                owner: { name: 'Rahul V.', rating: 4.8, verified: true },
+                description: 'Perfect for weddings and short films. Comes with 2 batteries and a 64GB fast SD card. Lens not included.',
+                features: ['33MP Full-Frame Sensor', '10 fps Shooting', '4K 60p Video'], co2Saved: 12.5, wasteSaved: 0.8
+            },
+            {
+                id: 'p2', name: 'Royal Enfield Classic 350', category: 'vehicles',
+                pricePerDay: 800, purchasePrice: 220000, location: 'Kochi, Kerala',
+                rating: 4.7, reviews: 56, image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                owner: { name: 'Anand K.', rating: 4.9, verified: true },
+                description: 'Well maintained Classic 350. Perfect for weekend getaways. Helmet included.',
+                features: ['349cc Engine', 'Dual Channel ABS', '20L Fuel Tank'], co2Saved: 85.0, wasteSaved: 195.0
+            },
+            {
+                id: 'p3', name: 'PlayStation 5 Console', category: 'gaming',
+                pricePerDay: 500, purchasePrice: 55000, location: 'Bangalore, KA',
+                rating: 5.0, reviews: 12, image: 'https://images.unsplash.com/photo-1606813907291-d86efa9b94db?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                owner: { name: 'Priya M.', rating: 5.0, verified: true },
+                description: 'PS5 Disc Edition with 2 DualSense controllers. Comes with FIFA 23.',
+                features: ['4K Gaming', 'Ray Tracing', 'Fast SSD'], co2Saved: 25.4, wasteSaved: 4.5
+            },
+            {
+                id: 'p4', name: 'Bosch Power Drill Set', category: 'tools',
+                pricePerDay: 200, purchasePrice: 6500, location: 'Chennai, TN',
+                rating: 4.5, reviews: 8, image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                owner: { name: 'Vikram S.', rating: 4.2, verified: false },
+                description: 'Complete drill set with multiple bits. Great for DIY home projects.',
+                features: ['Variable Speed', 'Reversible', '100 piece set'], co2Saved: 5.2, wasteSaved: 2.1
+            }
+        ];
+
+        // --- CONTEXT ---
+        const AppContext = createContext();
+        const useAppContext = () => useContext(AppContext);
+
+        const AppProvider = ({ children }) => {
+            const [currentRoute, setCurrentRoute] = useState('home');
+            const [user, setUser] = useState(null);
+            const [products, setProducts] = useState(INITIAL_PRODUCTS);
+            const [bookings, setBookings] = useState([]);
+            const [wishlist, setWishlist] = useState([]);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [toast, setToast] = useState(null);
+
+            const navigate = (route) => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setCurrentRoute(route);
+            };
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            const login = (email, password) => {
+                setUser({
+                    id: 'u1', name: 'Demo User', email: email,
+                    avatar: 'https://ui-avatars.com/api/?name=Demo+User&background=10b981&color=fff',
+                    joined: '2023', rating: 4.9
+                });
+                showToast('Logged in successfully!');
+                navigate('dashboard');
+            };
+
+            const logout = () => {
+                setUser(null);
+                showToast('Logged out', 'info');
+                navigate('home');
+            };
+
+            const toggleWishlist = (productId) => {
+                if (wishlist.includes(productId)) {
+                    setWishlist(wishlist.filter(id => id !== productId));
+                    showToast('Removed from wishlist', 'info');
+                } else {
+                    setWishlist([...wishlist, productId]);
+                    showToast('Added to wishlist');
+                }
+            };
+
+            const addBooking = (bookingData) => {
+                const newBooking = {
+                    ...bookingData,
+                    id: `BKG-${Math.floor(Math.random() * 100000)}`,
+                    status: 'active',
+                    createdAt: new Date().toISOString()
+                };
+                setBookings([newBooking, ...bookings]);
+                return newBooking;
+            };
+
+            return (
+                <AppContext.Provider value={{
+                    currentRoute, navigate, user, login, logout,
+                    products, setProducts, bookings, addBooking,
+                    wishlist, toggleWishlist, searchQuery, setSearchQuery,
+                    toast, showToast
+                }}>
+                    {children}
+                </AppContext.Provider>
+            );
+        };
+
+        // --- COMPONENTS ---
+        const Button = ({ children, variant = 'primary', className = '', onClick, type = 'button', disabled = false }) => {
+            const baseStyle = "inline-flex items-center justify-center px-6 py-3 rounded-xl font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+            const variants = {
+                primary: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 focus:ring-emerald-500",
+                secondary: "bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-200 focus:ring-slate-900",
+                outline: "border-2 border-slate-200 hover:border-emerald-600 text-slate-700 hover:text-emerald-600 bg-transparent focus:ring-emerald-500",
+                ghost: "bg-transparent hover:bg-slate-100 text-slate-600 hover:text-slate-900 focus:ring-slate-500"
+            };
+            return (
+                <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
+                    {children}
+                </button>
+            );
+        };
+
+        const Input = ({ label, type = 'text', placeholder, value, onChange, required = false, className = '', prefix = null }) => (
+            <div className={`flex flex-col gap-1.5 ${className}`}>
+                {label && <label className="text-sm font-semibold text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>}
+                <div className="relative">
+                    {prefix && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">{prefix}</div>}
+                    <input
+                        type={type} value={value} onChange={onChange} required={required} placeholder={placeholder}
+                        className={`w-full py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all outline-none ${prefix ? 'pl-10 pr-4' : 'px-4'}`}
+                    />
+                </div>
+            </div>
+        );
+
+        const ProductCard = ({ product }) => {
+            const { navigate, toggleWishlist, wishlist } = useAppContext();
+            const isWishlisted = wishlist.includes(product.id);
+
+            return (
+                <div onClick={() => navigate(`product/${product.id}`)} className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer border border-slate-100 flex flex-col h-full animate-slide-up">
+                    <div className="relative aspect-video overflow-hidden bg-slate-100">
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <button onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm rounded-full text-slate-400 hover:text-red-500 transition-colors shadow-sm">
+                            <i className={`fa-heart text-lg ${isWishlisted ? 'fa-solid text-red-500' : 'fa-regular'}`}></i>
+                        </button>
+                        {product.owner.verified && (
+                            <div className="absolute bottom-3 left-3 bg-emerald-500 text-white text-xs px-2 py-1 rounded-md font-medium flex items-center gap-1 shadow-sm">
+                                <i className="fa-solid fa-shield-halved"></i> Verified
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-5 flex flex-col flex-grow">
+                        <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-bold text-lg text-slate-900 line-clamp-1">{product.name}</h3>
+                            <div className="flex items-center gap-1 text-sm font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg">
+                                <i className="fa-solid fa-star text-yellow-400 text-xs"></i> {product.rating}
+                            </div>
+                        </div>
+                        <p className="text-slate-500 text-sm mb-4 flex items-center gap-1">
+                            <i className="fa-solid fa-location-dot text-slate-400"></i> {product.location}
+                        </p>
+                        <div className="mt-auto flex items-end justify-between border-t border-slate-50 pt-4">
+                            <div>
+                                <span className="text-2xl font-bold text-emerald-600">₹{product.pricePerDay}</span>
+                                <span className="text-slate-400 text-sm">/day</span>
+                            </div>
+                            <span className="text-emerald-600 font-medium text-sm group-hover:underline">View</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Navbar = () => {
+            const { user, navigate, currentRoute, logout, wishlist } = useAppContext();
+            const [isScrolled, setIsScrolled] = useState(false);
+            const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+            const [showAuthModal, setShowAuthModal] = useState(false);
+
+            useEffect(() => {
+                const handleScroll = () => setIsScrolled(window.scrollY > 20);
+                window.addEventListener('scroll', handleScroll);
+                return () => window.removeEventListener('scroll', handleScroll);
+            }, []);
+
+            return (
+                <>
+                    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-white/90 backdrop-blur-md shadow-sm py-3' : 'bg-white md:bg-transparent py-4 md:py-5 shadow-sm md:shadow-none'}`}>
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-between items-center">
+                            {/* Logo */}
+                            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => navigate('home')}>
+                                <div className="bg-emerald-600 text-white p-2 rounded-xl group-hover:rotate-12 transition-transform shadow-md">
+                                    <i className="fa-solid fa-leaf text-xl"></i>
+                                </div>
+                                <div>
+                                    <span className={`font-extrabold text-xl tracking-tight block leading-none ${isScrolled ? 'text-slate-900' : 'text-slate-900 md:text-white'}`}>RENT DON'T BUY</span>
+                                    <span className="text-[10px] font-medium text-emerald-500 tracking-widest uppercase">Why buy it?</span>
+                                </div>
+                            </div>
+
+                            {/* Desktop Nav */}
+                            <div className="hidden md:flex items-center gap-8">
+                                <div className="flex gap-6">
+                                    {['Explore', 'About'].map(name => (
+                                        <button key={name} onClick={() => navigate(name.toLowerCase())}
+                                            className={`text-sm font-semibold transition-colors ${currentRoute === name.toLowerCase() ? 'text-emerald-500' : (isScrolled ? 'text-slate-600 hover:text-emerald-600' : 'text-slate-200 hover:text-white')}`}>
+                                            {name}
+                                        </button>
+                                    ))}
+                                </div>
+                                
+                                <div className={`flex items-center gap-4 border-l pl-6 ${isScrolled ? 'border-slate-200' : 'border-white/20'}`}>
+                                    <button onClick={() => navigate('dashboard')} className={`relative p-2 transition-colors ${isScrolled ? 'text-slate-600 hover:text-emerald-600' : 'text-white/80 hover:text-white'}`}>
+                                        <i className="fa-solid fa-heart text-xl"></i>
+                                        {wishlist.length > 0 && <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">{wishlist.length}</span>}
+                                    </button>
+                                    
+                                    {user ? (
+                                        <div className="flex items-center gap-3">
+                                            <Button variant={isScrolled ? "outline" : "primary"} onClick={() => navigate('list')} className="!py-2 !px-4 text-sm"><i className="fa-solid fa-plus mr-2"></i> List Item</Button>
+                                            <img src={user.avatar} onClick={() => navigate('dashboard')} alt="Avatar" className="w-10 h-10 rounded-full border-2 border-emerald-100 cursor-pointer" />
+                                        </div>
+                                    ) : (
+                                        <Button variant={isScrolled ? "primary" : "secondary"} className="!py-2" onClick={() => setShowAuthModal(true)}>Login</Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Mobile Toggle */}
+                            <button className={`md:hidden p-2 ${isScrolled ? 'text-slate-900' : 'text-slate-900'}`} onClick={() => setMobileMenuOpen(true)}>
+                                <i className="fa-solid fa-bars text-2xl"></i>
+                            </button>
+                        </div>
+                    </nav>
+
+                    {/* Mobile Menu */}
+                    {mobileMenuOpen && (
+                        <div className="fixed inset-0 z-[60] bg-white p-6 animate-fade-in flex flex-col">
+                            <div className="flex justify-between items-center mb-8">
+                                <span className="font-extrabold text-2xl text-slate-900">Menu</span>
+                                <button onClick={() => setMobileMenuOpen(false)} className="p-3 bg-slate-100 rounded-full text-slate-600">
+                                    <i className="fa-solid fa-xmark text-xl"></i>
+                                </button>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                {['Home', 'Explore', 'About'].map(name => (
+                                    <button key={name} onClick={() => { navigate(name.toLowerCase()); setMobileMenuOpen(false); }} className="text-left text-xl font-bold text-slate-800 py-4 border-b border-slate-100">
+                                        {name}
+                                    </button>
+                                ))}
+                                {user ? (
+                                    <>
+                                        <button onClick={() => { navigate('dashboard'); setMobileMenuOpen(false); }} className="text-left text-xl font-bold text-slate-800 py-4 border-b border-slate-100"><i className="fa-solid fa-gauge text-emerald-600 mr-2"></i> Dashboard</button>
+                                        <button onClick={() => { navigate('list'); setMobileMenuOpen(false); }} className="text-left text-xl font-bold text-emerald-600 py-4 border-b border-slate-100"><i className="fa-solid fa-circle-plus mr-2"></i> List an Item</button>
+                                        <button onClick={() => { logout(); setMobileMenuOpen(false); }} className="text-left text-xl font-bold text-red-500 py-4 mt-4"><i className="fa-solid fa-right-from-bracket mr-2"></i> Logout</button>
+                                    </>
+                                ) : (
+                                    <Button variant="primary" className="mt-8 py-4 text-lg w-full" onClick={() => { setShowAuthModal(true); setMobileMenuOpen(false); }}>Login / Sign Up</Button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+                </>
+            );
+        };
+
+        const AuthModal = ({ onClose }) => {
+            const { login } = useAppContext();
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('demo@rentdontbuy.com');
+            const [password, setPassword] = useState('Demo123!');
+            const [isAnimating, setIsAnimating] = useState(false);
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                setIsAnimating(true);
+                setTimeout(() => {
+                    login(email, password);
+                    setIsAnimating(false);
+                    onClose();
+                }, 1500);
+            };
+
+            return (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl relative overflow-hidden animate-slide-up">
+                        {isAnimating && (
+                            <div className="absolute inset-0 bg-emerald-600 flex flex-col items-center justify-center z-10 text-white">
+                                <i className="fa-solid fa-circle-check text-6xl mb-4 animate-bounce"></i>
+                                <h2 className="text-2xl font-bold">Welcome!</h2>
+                            </div>
+                        )}
+                        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-slate-100 text-slate-500 rounded-full"><i className="fa-solid fa-xmark"></i></button>
+                        <div className="text-center mb-8 pt-4">
+                            <div className="bg-emerald-100 text-emerald-600 w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <i className="fa-solid fa-leaf text-xl"></i>
+                            </div>
+                            <h2 className="text-2xl font-extrabold text-slate-900 mb-2">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+                            <p className="text-slate-500 text-sm">Enter your details to proceed.</p>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {!isLogin && <Input label="Full Name" placeholder="John Doe" required />}
+                            <Input label="Email Address" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                            <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+                            <Button type="submit" className="w-full mt-4 py-4 text-lg">{isLogin ? 'Login' : 'Sign Up'}</Button>
+                        </form>
+                        <div className="mt-6 text-center text-sm text-slate-600">
+                            {isLogin ? "Don't have an account? " : "Already have an account? "}
+                            <button onClick={() => setIsLogin(!isLogin)} className="font-bold text-emerald-600">{isLogin ? 'Sign up' : 'Log in'}</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const HomeView = () => {
+            const { navigate, products, setSearchQuery } = useAppContext();
+            const [searchInput, setSearchInput] = useState('');
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                if(searchInput.trim()) { setSearchQuery(searchInput); navigate('explore'); }
+            };
+
+            return (
+                <div className="w-full animate-fade-in">
+                    {/* Hero Section */}
+                    <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden bg-slate-900">
+                        <div className="absolute inset-0 overflow-hidden">
+                            <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-500 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse"></div>
+                            <div className="absolute top-40 -left-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply blur-3xl opacity-20 animate-pulse" style={{animationDelay: '2s'}}></div>
+                        </div>
+
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10 flex flex-col items-center text-center">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 text-emerald-300 font-medium text-xs md:text-sm mb-6">
+                                <i className="fa-solid fa-leaf"></i> Eco-friendly alternative to buying
+                            </div>
+                            
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-white tracking-tight mb-6 leading-tight">
+                                Don't Buy It. <br className="md:hidden"/><span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Rent It.</span>
+                            </h1>
+                            
+                            <p className="text-base md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 px-4">
+                                Get access to the things you need without paying the price of ownership. Save money, reduce waste.
+                            </p>
+
+                            <form onSubmit={handleSearch} className="w-full max-w-2xl relative mb-8 px-4 md:px-0">
+                                <i className="fa-solid fa-magnifying-glass absolute left-8 md:left-5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                                <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
+                                    className="w-full pl-12 md:pl-14 pr-24 md:pr-32 py-4 md:py-5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 text-base md:text-lg shadow-2xl"
+                                    placeholder="What are you looking for?" />
+                                <button type="submit" className="absolute right-6 md:right-2 top-1/2 -translate-y-1/2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold px-4 md:px-6 py-2 md:py-3 rounded-xl transition-colors text-sm md:text-base">Search</button>
+                            </form>
+
+                            <div className="flex flex-wrap justify-center gap-2 md:gap-3 text-xs md:text-sm text-slate-400">
+                                <span>Popular:</span>
+                                {['Camera', 'PS5', 'Tent', 'Drill'].map(tag => (
+                                    <button key={tag} onClick={() => {setSearchQuery(tag); navigate('explore')}} className="hover:text-emerald-400 border-b border-slate-700 hover:border-emerald-400 pb-0.5">{tag}</button>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* Stats */}
+                    <section className="py-8 md:py-12 bg-emerald-600 text-white relative z-20 md:-mt-6 mx-4 md:mx-auto md:max-w-5xl rounded-3xl shadow-2xl shadow-emerald-900/20">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 px-4 md:px-8 text-center">
+                            <div><div className="text-2xl md:text-4xl font-black mb-1">10k+</div><div className="text-emerald-200 text-xs md:text-sm font-medium uppercase">Items Listed</div></div>
+                            <div><div className="text-2xl md:text-4xl font-black mb-1">5k+</div><div className="text-emerald-200 text-xs md:text-sm font-medium uppercase">Happy Renters</div></div>
+                            <div><div className="text-2xl md:text-4xl font-black mb-1">₹50L+</div><div className="text-emerald-200 text-xs md:text-sm font-medium uppercase">Money Saved</div></div>
+                            <div><div className="text-2xl md:text-4xl font-black mb-1">45k</div><div className="text-emerald-200 text-xs md:text-sm font-medium uppercase">kg CO₂ Saved</div></div>
+                        </div>
+                    </section>
+
+                    {/* Categories */}
+                    <section className="py-16 md:py-20 max-w-7xl mx-auto px-4 sm:px-6">
+                        <div className="flex justify-between items-end mb-8 md:mb-10">
+                            <div>
+                                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Explore Categories</h2>
+                                <p className="text-slate-500 text-sm md:text-base">Find exactly what you need.</p>
+                            </div>
+                            <Button variant="ghost" onClick={() => navigate('explore')} className="hidden sm:flex text-sm"><i className="fa-solid fa-arrow-right ml-2"></i> View All</Button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                            {CATEGORIES.map(cat => (
+                                <button key={cat.id} onClick={() => {setSearchQuery(cat.id); navigate('explore')}} className="group flex flex-col items-center p-4 md:p-6 bg-white rounded-2xl border border-slate-100 hover:border-emerald-200 hover:shadow-lg transition-all hover:-translate-y-1">
+                                    <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-50 group-hover:bg-emerald-50 rounded-full flex items-center justify-center mb-3 md:mb-4 transition-colors">
+                                        <i className={`fa-solid ${cat.icon} text-xl md:text-2xl text-slate-600 group-hover:text-emerald-600`}></i>
+                                    </div>
+                                    <span className="font-semibold text-slate-800 text-sm md:text-base group-hover:text-emerald-600">{cat.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Featured */}
+                    <section className="py-16 md:py-20 bg-slate-50 border-t border-slate-100">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+                            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Trending Rentals</h2>
+                            <p className="text-slate-500 text-sm md:text-base mb-8 md:mb-10">Highly rated items near you.</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {products.slice(0, 4).map(product => <ProductCard key={product.id} product={product} />)}
+                            </div>
+                            <div className="mt-8 text-center sm:hidden">
+                                <Button variant="outline" className="w-full" onClick={() => navigate('explore')}>View All Items</Button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            );
+        };
+
+        const ExploreView = () => {
+            const { products, navigate, searchQuery, setSearchQuery } = useAppContext();
+            const [activeCategory, setActiveCategory] = useState('all');
+            const [maxPrice, setMaxPrice] = useState(5000);
+            const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+            const filteredProducts = useMemo(() => {
+                return products.filter(p => {
+                    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()) || p.location.toLowerCase().includes(searchQuery.toLowerCase());
+                    const matchCat = activeCategory === 'all' || p.category === activeCategory;
+                    const matchPrice = p.pricePerDay <= maxPrice;
+                    return matchSearch && matchCat && matchPrice;
+                });
+            }, [products, searchQuery, activeCategory, maxPrice]);
+
+            const FilterContent = () => (
+                <>
+                    <div className="mb-6">
+                        <label className="text-sm font-bold text-slate-700 block mb-3 uppercase tracking-wider">Category</label>
+                        <div className="space-y-1">
+                            <button onClick={() => setActiveCategory('all')} className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${activeCategory === 'all' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>All Items</button>
+                            {CATEGORIES.map(cat => (
+                                <button key={cat.id} onClick={() => setActiveCategory(cat.id)} className={`block w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${activeCategory === cat.id ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>
+                                    <i className={`fa-solid ${cat.icon} w-5 text-center mr-2 opacity-70`}></i> {cat.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-bold text-slate-700 block mb-3 uppercase tracking-wider">Max Price: <span className="text-emerald-600">₹{maxPrice}/day</span></label>
+                        <input type="range" min="100" max="5000" step="100" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-full accent-emerald-600" />
+                    </div>
+                </>
+            );
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 md:pt-32 pb-20 flex flex-col md:flex-row gap-8 animate-fade-in">
+                    {/* Mobile Filter Toggle */}
+                    <div className="md:hidden flex justify-between items-center mb-4">
+                        <h1 className="text-2xl font-bold text-slate-900">Explore</h1>
+                        <button onClick={() => setShowMobileFilters(!showMobileFilters)} className="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 font-medium text-sm flex items-center gap-2">
+                            <i className="fa-solid fa-filter"></i> Filters
+                        </button>
+                    </div>
+
+                    {/* Sidebar Filters Desktop */}
+                    <aside className={`w-full md:w-64 shrink-0 ${showMobileFilters ? 'block' : 'hidden md:block'}`}>
+                        <div className="sticky top-24 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                            <h3 className="font-bold text-lg mb-6 hidden md:flex items-center gap-2"><i className="fa-solid fa-filter text-emerald-500"></i> Filters</h3>
+                            <FilterContent />
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 md:mb-8 gap-4">
+                            <div className="hidden md:block">
+                                <h1 className="text-3xl font-bold text-slate-900">Rentals</h1>
+                                <p className="text-slate-500 mt-1 text-sm">Showing {filteredProducts.length} results</p>
+                            </div>
+                            
+                            <div className="relative w-full sm:w-auto">
+                                <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" placeholder="Search products, city..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full sm:w-72 pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm shadow-sm" />
+                                {searchQuery && (
+                                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-slate-100 rounded-full text-slate-500 flex items-center justify-center hover:bg-slate-200 text-xs"><i className="fa-solid fa-xmark"></i></button>
+                                )}
+                            </div>
+                        </div>
+
+                        {filteredProducts.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {filteredProducts.map(product => <ProductCard key={product.id} product={product} />)}
+                            </div>
+                        ) : (
+                            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+                                <i className="fa-solid fa-box-open text-4xl text-slate-300 mb-4"></i>
+                                <h3 className="text-xl font-bold text-slate-900 mb-2">No items found</h3>
+                                <p className="text-slate-500 mb-6 text-sm">Try adjusting your search or filters.</p>
+                                <Button onClick={() => {setSearchQuery(''); setActiveCategory('all'); setMaxPrice(5000);}}>Clear All Filters</Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const ProductDetailView = () => {
+            const { currentRoute, products, navigate, user, showToast } = useAppContext();
+            const productId = currentRoute.split('/')[1];
+            const product = products.find(p => p.id === productId);
+            const [rentDays, setRentDays] = useState(3);
+            
+            if (!product) return <div className="py-32 text-center text-xl">Product not found.</div>;
+
+            const totalCost = product.pricePerDay * rentDays;
+            const fee = Math.round(totalCost * 0.05);
+            const deposit = Math.round(product.purchasePrice * 0.1);
+            
+            const handleRentNow = () => {
+                if(!user) return showToast('Please login to rent items', 'error');
+                navigate(`checkout/${product.id}?days=${rentDays}`);
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-24 pb-20 animate-slide-up">
+                    <button onClick={() => navigate('explore')} className="flex items-center text-slate-500 hover:text-emerald-600 mb-6 text-sm font-medium"><i className="fa-solid fa-arrow-left mr-2"></i> Back to Explore</button>
+
+                    <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
+                        <div className="lg:col-span-2 space-y-8">
+                            <div className="rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 aspect-[4/3] relative">
+                                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight mb-4">{product.name}</h1>
+                                <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-slate-600 mb-6 pb-6 border-b border-slate-100">
+                                    <div className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full"><i className="fa-solid fa-star text-yellow-500"></i> {product.rating}</div>
+                                    <div className="bg-slate-100 px-3 py-1 rounded-full"><i className="fa-solid fa-location-dot text-slate-400"></i> {product.location}</div>
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-900 mb-3">Description</h3>
+                                <p className="text-slate-600 leading-relaxed mb-8">{product.description}</p>
+                                
+                                <h3 className="text-xl font-bold text-slate-900 mb-4">Features</h3>
+                                <ul className="grid sm:grid-cols-2 gap-3 mb-8">
+                                    {product.features.map((f, i) => (
+                                        <li key={i} className="flex items-center gap-2 bg-slate-50 px-4 py-3 rounded-xl text-sm font-medium border border-slate-100">
+                                            <i className="fa-solid fa-check text-emerald-500"></i> {f}
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                {/* Eco Impact */}
+                                <div className="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-2xl p-6 border border-emerald-100">
+                                    <h3 className="text-lg font-bold text-emerald-900 mb-4 flex items-center gap-2"><i className="fa-solid fa-leaf"></i> Eco Impact</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-white/60 p-4 rounded-xl text-center"><div className="text-xl font-black text-emerald-600">{product.co2Saved} kg</div><div className="text-xs uppercase font-bold text-emerald-800/60">CO₂ Avoided</div></div>
+                                        <div className="bg-white/60 p-4 rounded-xl text-center"><div className="text-xl font-black text-cyan-600">{product.wasteSaved} kg</div><div className="text-xs uppercase font-bold text-cyan-800/60">Waste Prevented</div></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Checkout Card */}
+                        <div className="lg:col-span-1">
+                            <div className="sticky top-24 bg-white rounded-3xl p-6 shadow-xl border border-slate-100">
+                                <div className="flex items-end gap-1 mb-6 pb-6 border-b border-slate-100">
+                                    <span className="text-4xl font-black text-slate-900">₹{product.pricePerDay}</span>
+                                    <span className="text-slate-500 font-medium mb-1">/ day</span>
+                                </div>
+                                <label className="text-sm font-bold text-slate-700 block mb-2">Duration (Days)</label>
+                                <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-slate-200 mb-6">
+                                    <button onClick={() => setRentDays(Math.max(1, rentDays-1))} className="w-12 h-12 flex items-center justify-center text-slate-500 hover:bg-slate-200 rounded-lg text-xl font-bold">-</button>
+                                    <div className="flex-1 text-center font-bold text-lg">{rentDays}</div>
+                                    <button onClick={() => setRentDays(rentDays+1)} className="w-12 h-12 flex items-center justify-center text-slate-500 hover:bg-slate-200 rounded-lg text-xl font-bold">+</button>
+                                </div>
+                                <div className="bg-slate-50 p-4 rounded-xl space-y-3 text-sm mb-6">
+                                    <div className="flex justify-between text-slate-600"><span>Rental</span><span className="font-bold text-slate-900">₹{totalCost}</span></div>
+                                    <div className="flex justify-between text-slate-600"><span>Fee</span><span className="font-bold text-slate-900">₹{fee}</span></div>
+                                    <div className="flex justify-between text-slate-600"><span>Deposit (Refundable)</span><span className="font-bold text-slate-900">₹{deposit}</span></div>
+                                    <div className="border-t border-slate-200 pt-3 flex justify-between font-black text-lg text-slate-900"><span>Total</span><span>₹{totalCost + fee + deposit}</span></div>
+                                </div>
+                                <Button className="w-full py-4 text-lg mb-6" onClick={handleRentNow}>Rent Now</Button>
+                                
+                                <div className="pt-6 border-t border-slate-100 flex items-center gap-4">
+                                    <img src={`https://ui-avatars.com/api/?name=${product.owner.name.replace(' ','+')}&background=f1f5f9`} className="w-12 h-12 rounded-full" />
+                                    <div>
+                                        <div className="font-bold text-sm text-slate-900">{product.owner.name}</div>
+                                        <div className="text-xs text-slate-500"><i className="fa-solid fa-star text-yellow-400"></i> {product.owner.rating} Owner Rating</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CheckoutView = () => {
+            const { currentRoute, products, navigate, addBooking, user } = useAppContext();
+            const path = currentRoute.split('?')[0];
+            const qs = currentRoute.split('?')[1] || '';
+            const productId = path.split('/')[1];
+            const product = products.find(p => p.id === productId);
+            const days = parseInt(new URLSearchParams(qs).get('days')) || 1;
+            const [step, setStep] = useState(1);
+            const [isProcessing, setIsProcessing] = useState(false);
+
+            if (!product || !user) return <div className="py-32 text-center">Error. <button onClick={()=>navigate('explore')} className="text-emerald-600 underline">Go back</button></div>;
+
+            const cost = product.pricePerDay * days;
+            const deposit = Math.round(product.purchasePrice * 0.1);
+            const total = cost + deposit + Math.round(cost * 0.05);
+
+            const handlePayment = () => {
+                setIsProcessing(true);
+                setTimeout(() => {
+                    addBooking({ product, days, totalAmount: total });
+                    setIsProcessing(false);
+                    setStep(3);
+                }, 2000);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 pt-24 pb-12 animate-fade-in">
+                    <div className="max-w-2xl mx-auto px-4">
+                        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden mt-8">
+                            {step === 1 && (
+                                <div className="animate-slide-up">
+                                    <div className="p-6 md:p-8 border-b border-slate-100">
+                                        <h2 className="text-2xl font-bold text-slate-900 mb-6">Review Rental</h2>
+                                        <div className="flex gap-4 items-center">
+                                            <img src={product.image} className="w-20 h-20 rounded-xl object-cover" />
+                                            <div>
+                                                <h3 className="font-bold text-lg text-slate-900 leading-tight">{product.name}</h3>
+                                                <p className="text-slate-500 text-sm mt-1">{days} Days Rental</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-6 md:p-8 bg-slate-50">
+                                        <div className="space-y-3 text-sm text-slate-600 mb-8">
+                                            <div className="flex justify-between"><span>Rental Cost</span><span className="font-bold text-slate-900">₹{cost}</span></div>
+                                            <div className="flex justify-between"><span>Security Deposit</span><span className="font-bold text-slate-900">₹{deposit}</span></div>
+                                            <div className="pt-3 border-t border-slate-200 flex justify-between text-xl font-black text-slate-900"><span>Total Due</span><span>₹{total}</span></div>
+                                        </div>
+                                        <Button className="w-full" onClick={() => setStep(2)}>Proceed to Payment</Button>
+                                    </div>
+                                </div>
+                            )}
+                            {step === 2 && (
+                                <div className="p-6 md:p-8 text-center animate-slide-up">
+                                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment</h2>
+                                    <p className="text-slate-500 mb-8">Amount: ₹{total}</p>
+                                    {isProcessing ? (
+                                        <div className="py-12"><i className="fa-solid fa-spinner fa-spin text-4xl text-emerald-500 mb-4"></i><p>Processing...</p></div>
+                                    ) : (
+                                        <>
+                                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 mb-8">
+                                                <i className="fa-solid fa-qrcode text-6xl text-slate-300 mb-2"></i>
+                                                <p className="text-xs text-slate-500">Demo UPI Payment</p>
+                                            </div>
+                                            <Button className="w-full" onClick={handlePayment}>Pay ₹{total}</Button>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {step === 3 && (
+                                <div className="py-16 px-6 text-center animate-slide-up">
+                                    <i className="fa-solid fa-circle-check text-6xl text-emerald-500 mb-4 animate-bounce-slow"></i>
+                                    <h2 className="text-3xl font-extrabold text-slate-900 mb-2">Confirmed!</h2>
+                                    <p className="text-slate-600 mb-8 text-sm">Your rental for {product.name} is booked.</p>
+                                    <Button onClick={() => navigate('dashboard')} className="w-full">Go to Dashboard</Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DashboardView = () => {
+            const { user, bookings, navigate } = useAppContext();
+            const [tab, setTab] = useState('rentals');
+
+            if (!user) return <div className="pt-32 pb-20 text-center"><h2 className="text-xl font-bold mb-4">Login required</h2><Button onClick={()=>navigate('home')}>Home</Button></div>;
+
+            return (
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-20 animate-fade-in">
+                    <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 mb-8 flex items-center gap-4">
+                        <img src={user.avatar} className="w-16 h-16 md:w-20 md:h-20 rounded-full" />
+                        <div>
+                            <h1 className="text-2xl font-extrabold text-slate-900">{user.name}</h1>
+                            <p className="text-slate-500 text-sm"><i className="fa-solid fa-star text-yellow-400"></i> {user.rating} Rating</p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-4 border-b border-slate-200 mb-6 overflow-x-auto no-scrollbar">
+                        {['rentals', 'listings'].map(t => (
+                            <button key={t} onClick={() => setTab(t)} className={`pb-3 text-sm font-bold uppercase tracking-wider whitespace-nowrap ${tab === t ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-400'}`}>
+                                My {t}
+                            </button>
+                        ))}
+                    </div>
+
+                    {tab === 'rentals' && (
+                        bookings.length === 0 ? (
+                            <div className="text-center py-16 bg-white rounded-2xl border border-slate-200"><p className="text-slate-500 mb-4">No active rentals.</p><Button onClick={()=>navigate('explore')}>Explore</Button></div>
+                        ) : (
+                            <div className="space-y-4">
+                                {bookings.map(b => (
+                                    <div key={b.id} className="bg-white p-4 rounded-xl border border-slate-200 flex gap-4 items-center">
+                                        <img src={b.product.image} className="w-16 h-16 rounded-lg object-cover" />
+                                        <div className="flex-1">
+                                            <div className="text-xs font-bold text-emerald-600 mb-1">ACTIVE • {b.days} Days</div>
+                                            <h3 className="font-bold text-slate-900 text-sm line-clamp-1">{b.product.name}</h3>
+                                            <p className="text-xs text-slate-500 mt-1">₹{b.totalAmount} Paid</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    )}
+                    {tab === 'listings' && (
+                        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200"><p className="text-slate-500 mb-4">You have no items listed.</p><Button onClick={()=>navigate('list')}>List an Item</Button></div>
+                    )}
+                </div>
+            );
+        };
+
+        const ListProductView = () => {
+            const { navigate, showToast } = useAppContext();
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                showToast('Item listed successfully! (Demo)');
+                navigate('dashboard');
+            };
+
+            return (
+                <div className="max-w-2xl mx-auto px-4 pt-24 pb-20 animate-fade-in">
+                    <h1 className="text-3xl font-bold text-slate-900 mb-2">List an Item</h1>
+                    <p className="text-slate-500 text-sm mb-8">Earn money from your unused items.</p>
+                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
+                        <Input label="Item Name" required placeholder="e.g. Sony Camera" />
+                        <div className="flex gap-4"><Input label="Price/Day (₹)" type="number" required className="flex-1"/><Input label="Value (₹)" type="number" required className="flex-1"/></div>
+                        <Input label="Location" required />
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-semibold text-slate-700">Description</label>
+                            <textarea rows="3" required className="p-3 rounded-xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                        </div>
+                        <Button type="submit" className="w-full mt-4">Publish Listing</Button>
+                    </form>
+                </div>
+            );
+        };
+
+        const AppContent = () => {
+            const { currentRoute, toast } = useAppContext();
+            
+            const renderRoute = () => {
+                const path = currentRoute.split('?')[0].split('/')[0];
+                switch(path) {
+                    case 'home': return <HomeView />;
+                    case 'explore': return <ExploreView />;
+                    case 'product': return <ProductDetailView />;
+                    case 'checkout': return <CheckoutView />;
+                    case 'dashboard': return <DashboardView />;
+                    case 'list': return <ListProductView />;
+                    case 'about': return <div className="pt-32 text-center text-xl font-bold pb-40">About Us (Demo Page)</div>;
+                    default: return <HomeView />;
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    <Navbar />
+                    <main className="flex-grow">{renderRoute()}</main>
+                    
+                    {/* Minimal Footer */}
+                    <footer className="bg-slate-950 text-slate-400 py-12 mt-auto">
+                        <div className="max-w-7xl mx-auto px-6 text-center md:text-left grid md:grid-cols-2 gap-8">
+                            <div>
+                                <h3 className="text-white font-bold text-lg mb-2"><i className="fa-solid fa-leaf text-emerald-500 mr-2"></i> RENT DON'T BUY</h3>
+                                <p className="text-sm">The modern marketplace for renting everyday items.</p>
+                            </div>
+                            <div className="md:text-right text-xs pt-4 md:pt-0">
+                                <p>© 2026 Rent Don't Buy Inc. Demo App.</p>
+                            </div>
+                        </div>
+                    </footer>
+
+                    {/* Toast Notification */}
+                    {toast && (
+                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-slide-up">
+                            <div className={`flex items-center gap-2 px-4 py-3 rounded-full shadow-lg font-medium text-sm ${toast.type === 'error' ? 'bg-red-600 text-white' : toast.type === 'info' ? 'bg-slate-800 text-white' : 'bg-emerald-600 text-white'}`}>
+                                <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : toast.type==='info' ? 'fa-circle-info' : 'fa-circle-check'}`}></i> {toast.message}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const App = () => (
+            <AppProvider>
+                <AppContent />
+            </AppProvider>
+        );
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
